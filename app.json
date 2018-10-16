@@ -1,0 +1,30 @@
+{
+  "name": "Bellance Backend",
+  "description": "Backend API for the Bellance App",
+  "env": {
+    "MONGODB_URI": {
+      "description": "URI of your mongo DB.",
+      "value": "mongodb://localhost:27017/trust-wallet"
+    },
+    "MYSQL_HOST": {
+      "description": "Hostname of mysql server",
+      "value": "localhost"
+    },
+    "MYSQL_USER": {
+      "description": "Username of mysql connection",
+      "value": "funnel"
+    },
+    "MYSQL_PASSWORD": {
+      "description": "Password of mysql connection",
+      "value": "funnel"
+    },
+    "MYSQL_DB": {
+      "description": "DB of mysql connection",
+      "value": "funnel"
+    },
+    "RPC_SERVER": {
+      "description": "RPC URL of your blockchain node.",
+      "value": "http://127.0.0.1:8545"
+    }
+  }
+}
