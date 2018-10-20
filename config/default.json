@@ -5,7 +5,7 @@
     "MYSQL_HOST": "localhost",
     "MYSQL_USER": "funnel",
     "MYSQL_PASSWORD": "funnel",
-    "MYSQL_DATABASE": "funnel",
+    "MYSQL_DATABASE": "funnel2",
     "RPC_SERVER": "http://127.0.0.1:8545",
   "PARSER": {
     "MAX_CONCURRENT_BLOCKS": 100,

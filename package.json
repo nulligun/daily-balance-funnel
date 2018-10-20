@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@types/mysql": "^2.15.5",
+    "@types/web3": "^1.0.10",
     "async": "^2.6.1",
     "bcrypt-nodejs": "^0.0.3",
     "bluebird": "^3.5.2",

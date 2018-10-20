@@ -17,7 +17,7 @@ export class Config {
                         if (stateDiff[address]['balance']['*']) {
                             let b1 = Config.web3.utils.toBN(stateDiff[address]['balance']['*']['from']);
                             let b2 = Config.web3.utils.toBN(stateDiff[address]['balance']['*']['to']);
-                            return {address: address, delta: b2.sub(b1).toString()};
+                            return {address: address, delta: b2.sub(b1)};
                         }
                         return {address: address, delta: "0"};
                     });
