@@ -36,7 +36,7 @@ export class Validator {
                 const m = moment.unix(block.timestamp).utc().endOf('day');
 
                 if (m.unix() > currentDayTimestamp) {
-                    resolve({status: "done"});
+                    resolve({status: "done", block: block.number});
                 }
 
                 self.process(block).then((rawStateChanges: any) => {
@@ -139,7 +139,7 @@ export class Validator {
                             });
                         });
                     } else {
-                        console.log("Balance matches for " + address_id + " on " + timestamp);
+                        //console.log("Balance matches for " + address_id + " on " + timestamp);
                         self.connection.commit((error: any) => {
                             if (error) throw error;
                         });
