@@ -26,7 +26,7 @@ def deploy():
     rsync_project(
         local_dir=os.getcwd() + '/',
         remote_dir=env.DEPLOY_TO + '/',
-        extra_opts='-l',
+        extra_opts='-l --exclude-from=%s/build/sync.ignore' % os.getcwd(),
         exclude=[],
         delete=True
     )
