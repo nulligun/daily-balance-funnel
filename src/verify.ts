@@ -13,7 +13,10 @@ const connection = mysql.createConnection({
     host     : config.get("MYSQL_HOST"),
     user     : config.get("MYSQL_USER"),
     password : config.get("MYSQL_PASSWORD"),
-    database : config.get("MYSQL_DATABASE")
+    database : config.get("MYSQL_DATABASE"),
+    supportBigNumbers : true,
+    bigNumberStrings : true
+
 });
 
 let maxConcurrentBlocks = parseInt(config.get("PARSER.MAX_CONCURRENT_BLOCKS")) || 5;
@@ -41,6 +44,7 @@ connection.query("select current_full_validate_block from validate_status", func
 
                 function process() {
                     if (currentBlockNumber > latestBlockOnChain) {
+                        console.log("At last block, sleeping ")
                         setDelay(5000).then(() => {
                             latestBlockOnChain = Config.web3.eth.getBlockNumber();
                             process();
