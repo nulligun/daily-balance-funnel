@@ -16,6 +16,8 @@ const connection = mysql.createConnection({
     database : config.get("MYSQL_DATABASE")
 });
 
+let maxConcurrentBlocks = parseInt(config.get("PARSER.MAX_CONCURRENT_BLOCKS")) || 5;
+
 connection.query("select current_full_validate_block from validate_status", function(error:any, results:any, fields:any) {
     let currentBlockNumber = 1;
     if (error) throw error;
@@ -29,7 +31,6 @@ connection.query("select current_full_validate_block from validate_status", func
         const starter = new Validator(connection);
         starter.loadAddresses().then(() => {
             console.log("Addresses loaded");
-            let batchMax = 50;
             Config.web3.eth.getBlockNumber((error: any, number:any) => {
                 if (error) throw error;
                 let latestBlockOnChain = number;
@@ -47,7 +48,7 @@ connection.query("select current_full_validate_block from validate_status", func
                     } else {
                         blocks.push(starter.next(currentBlockNumber, currentDayTimestamp));
                         currentBlockNumber++;
-                        if (blocks.length > batchMax) {
+                        if (blocks.length > maxConcurrentBlocks) {
                             let maxValidBlock = 0;
                             let done = false;
                             Promise.all(blocks).then((results: any) => {
