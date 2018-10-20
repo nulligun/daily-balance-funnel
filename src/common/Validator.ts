@@ -123,7 +123,7 @@ export class Validator {
                 if (error) throw error;
                 if (results.length === 0) {
                     console.log("Balance not found for " + address_id + " on " + timestamp);
-                    self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance], function (error: any, results: any, fields: any) {
+                    self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
                         if (error) throw error;
                         self.connection.commit((error: any) => {
                             if (error) throw error;
@@ -132,7 +132,7 @@ export class Validator {
                 } else {
                     if (results[0].delta !== balance.toString()) {
                         console.log("Balance not a match for " + address_id + " on " + timestamp);
-                        self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance], function (error: any, results: any, fields: any) {
+                        self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
                             if (error) throw error;
                             self.connection.commit((error: any) => {
                                 if (error) throw error;
