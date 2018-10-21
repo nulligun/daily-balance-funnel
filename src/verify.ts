@@ -29,6 +29,8 @@ const connection = mysql.createConnection({
 });
 
 let maxConcurrentBlocks = parseInt(config.get("PARSER.MAX_CONCURRENT_BLOCKS")) || 5;
+let endOfBlockDelay = parseInt(config.get("PARSER.DELAYS.END_OF_BLOCK")) || 5000;
+let betweenBlockDelay = parseInt(config.get("PARSER.DELAYS.BETWEEN_BLOCK")) || 100;
 let checkpoint = 1000;
 
 connection.query("select current_full_validate_block from validate_status", function(error:any, results:any, fields:any) {
@@ -66,7 +68,7 @@ connection.query("select current_full_validate_block from validate_status", func
                         }
                         if (currentBlockNumber > latestBlockOnChain) {
                             console.log("At last block, sleeping...");
-                            setDelay(5000).then(() => {
+                            setDelay(endOfBlockDelay).then(() => {
                                 latestBlockOnChain = Config.web3.eth.getBlockNumber();
                                 progressInfo = new ProgressInfo(latestBlockOnChain, checkpoint);
                                 Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
@@ -75,6 +77,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                     process();
                                 });
                             });
+                            return;
                         } else {
                             blocks.push(starter.next(currentBlockNumber, currentDayTimestamp));
                             currentBlockNumber++;
@@ -127,10 +130,14 @@ connection.query("select current_full_validate_block from validate_status", func
                                                     throw error;
                                                 }
                                             });
-                                            process();
+                                            setDelay(betweenBlockDelay).then(() => {
+                                                process();
+                                            });
                                         });
                                     } else {
-                                        process();
+                                        setDelay(betweenBlockDelay).then(() => {
+                                            process();
+                                        });
                                     }
                                 });
                             } else {
