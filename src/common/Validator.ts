@@ -45,7 +45,6 @@ export class Validator {
                 let proms = self.process(block);
                 if (proms.length > 0) {
                     Promise.all(proms).then((rawStateChanges) => {
-                        //self.process(block).then((rawStateChanges: any) => {
                         let blockBalanceChanges: any = {};
                         rawStateChanges.forEach((rawStateChange: any) => {
                             rawStateChange.changes.forEach((change: any) => {
