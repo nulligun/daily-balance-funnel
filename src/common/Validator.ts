@@ -91,7 +91,7 @@ export class Validator {
                                                 throw err;
                                             });
                                         }
-                                        this.addresses[address] = results.insertId;
+                                        self.addresses[address] = results.insertId;
                                         self.validateBalances(ts, balances[address], results.insertId);
                                         resolve();
                                     });
