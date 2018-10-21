@@ -1,7 +1,4 @@
 {
-  "MONGO": {
-    "URI": "mongodb://localhost:27017/bellance"
-  },
     "MYSQL_HOST": "localhost",
     "MYSQL_USER": "funnel",
     "MYSQL_PASSWORD": "funnel",
