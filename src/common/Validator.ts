@@ -3,7 +3,7 @@ import moment = require("moment");
 
 export class Validator {
     private connection : any;
-    readonly addresses : any;
+    private readonly addresses : any;
     readonly shouldVerify : boolean;
 
     constructor(connection:any, shouldVerify:boolean) {
@@ -66,6 +66,7 @@ export class Validator {
         const self = this;
         let ts = timestamp;
         return new Promise((resolve, reject) => {
+            if (Object.keys(balances).length === 0) { resolve(); }
             Object.keys(balances).forEach((address) => {
                 if (!(address in this.addresses))
                 {
@@ -124,16 +125,17 @@ export class Validator {
                 if (error) throw error;
                 if (results.length === 0) {
                     console.log("Balance not found for " + address_id + " on " + timestamp);
+                    self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
+                        if (error) throw error;
+                    });
                 } else {
                     if (results[0].delta !== balance.toString()) {
                         console.log("Balance not a match for " + address_id + " on " + timestamp);
-                    } else {
-                        //console.log("Balance matches for " + address_id + " on " + timestamp);
+                        self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
+                            if (error) throw error;
+                        });
                     }
                 }
-                self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
-                    if (error) throw error;
-                });
             });
         } else {
             self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
