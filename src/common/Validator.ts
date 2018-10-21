@@ -1,14 +1,10 @@
-import { setDelay } from "./Utils";
 import { Config } from "./Config";
 import moment = require("moment");
-import * as Bluebird from "bluebird";
-
-const config = require("config");
 
 export class Validator {
     private connection : any;
-    private addresses : any;
-    private shouldVerify : boolean;
+    readonly addresses : any;
+    readonly shouldVerify : boolean;
 
     constructor(connection:any, shouldVerify:boolean) {
         this.shouldVerify = shouldVerify;
