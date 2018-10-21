@@ -59,7 +59,7 @@ connection.query("select current_full_validate_block from validate_status", func
                     let blocks: any = [];
                     let currentDayBalance: any = {};
 
-                    process();
+                    setTimeout(process, betweenBlockDelay);
 
                     function process() {
                         if (currentBlockNumber % checkpoint === 0) {
@@ -67,6 +67,10 @@ connection.query("select current_full_validate_block from validate_status", func
                             progressInfo.checkpoint();
                         }
                         if (currentBlockNumber > latestBlockOnChain) {
+                            if (starter.shouldVerify) {
+                                console.log("Verify done, last block reached");
+                                return;
+                            }
                             console.log("At last block, sleeping...");
                             setDelay(endOfBlockDelay).then(() => {
                                 latestBlockOnChain = Config.web3.eth.getBlockNumber();
@@ -74,7 +78,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                 Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
                                     if (error) throw error;
                                     lastBlockTimestamp = moment.unix(result.timestamp).utc().endOf('day').unix();
-                                    process();
+                                    setTimeout(process, betweenBlockDelay);
                                 });
                             });
                             return;
@@ -130,21 +134,24 @@ connection.query("select current_full_validate_block from validate_status", func
                                                     throw error;
                                                 }
                                             });
-                                            setDelay(betweenBlockDelay).then(() => {
-                                                process();
-                                            });
+                                            setTimeout(process, betweenBlockDelay);
+                                            return;
                                         });
                                     } else {
-                                        setDelay(betweenBlockDelay).then(() => {
-                                            process();
-                                        });
+                                        setTimeout(process, betweenBlockDelay);
+                                        return;
                                     }
                                 });
                             } else {
                                 if (currentDayTimestamp === lastBlockTimestamp) {
-                                    starter.validate(currentDayTimestamp, currentDayBalance).then((res) => {});
+                                    starter.validate(currentDayTimestamp, currentDayBalance).then((res) => {
+                                        setTimeout(process, betweenBlockDelay);
+                                        return;
+                                    });
+                                } else {
+                                    setTimeout(process, betweenBlockDelay);
+                                    return;
                                 }
-                                process();
                             }
                         }
                     }
