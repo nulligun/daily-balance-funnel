@@ -85,7 +85,7 @@ connection.query("select current_full_validate_block from validate_status", func
                         } else {
                             blocks.push(starter.next(currentBlockNumber, currentDayTimestamp));
                             currentBlockNumber++;
-                            if (blocks.length > maxConcurrentBlocks) {
+                            if ((blocks.length > maxConcurrentBlocks) || (currentDayTimestamp === lastBlockTimestamp)) {
                                 let maxValidBlock = 0;
                                 let maxBlockNumber = 0;
                                 let done = false;
@@ -121,19 +121,21 @@ connection.query("select current_full_validate_block from validate_status", func
                                         console.log("Moving on to block: " + currentBlockNumber);
                                     }
                                     blocks = [];
-                                    if (done) {
+                                    if (done || (currentDayTimestamp === lastBlockTimestamp)) {
                                         starter.validate(currentDayTimestamp, currentDayBalance).then((res) => {});
 
                                         Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
-                                            const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
-                                            currentDayTimestamp = m.unix();
-                                            console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
-                                            currentDayBalance = {};
-                                            connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
-                                                if (error) {
-                                                    throw error;
-                                                }
-                                            });
+                                            if (done) {
+                                                const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
+                                                currentDayTimestamp = m.unix();
+                                                console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
+                                                currentDayBalance = {};
+                                                connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
+                                                    if (error) {
+                                                        throw error;
+                                                    }
+                                                });
+                                            }
                                             setTimeout(process, betweenBlockDelay);
                                             return;
                                         });
@@ -143,15 +145,8 @@ connection.query("select current_full_validate_block from validate_status", func
                                     }
                                 });
                             } else {
-                                if (currentDayTimestamp === lastBlockTimestamp) {
-                                    starter.validate(currentDayTimestamp, currentDayBalance).then((res) => {
-                                        setTimeout(process, betweenBlockDelay);
-                                        return;
-                                    });
-                                } else {
-                                    setTimeout(process, betweenBlockDelay);
-                                    return;
-                                }
+                                setTimeout(process, betweenBlockDelay);
+                                return;
                             }
                         }
                     }
