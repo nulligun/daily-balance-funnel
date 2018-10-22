@@ -37,33 +37,79 @@ export class Validator {
                     resolve({status: "done", block: block.number});
                     return;
                 }
-
                 let blockReward = 5;
-                let uncleReward = 3.75;
-                let maxUncles = 2;
-                let uncleBlocks = block.uncles.length;
-                if (uncleBlocks > maxUncles) uncleBlocks = maxUncles;
                 let miner = block.author;
                 let blockBalanceChanges: any = {};
-                let miningReward = blockReward + (uncleBlocks * (blockReward / 32)) + (uncleBlocks * uncleReward);
-                blockBalanceChanges[miner] = Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString()));
+                let uncleBlocks = block.uncles.length;
+                let uncleReward = 0.625;
+                let maxUncles = 2;
 
-                Config.web3.getBlockStateChanges('0x' + block.number.toString(16), ["stateDiff"], (err: Error, stateChanges: any) => {
-                    if (err) reject (err);
-                    stateChanges.forEach((stateChange:any) => {
-                        stateChange.forEach((change: any) => {
-                            if (change.delta != 0) {
-                                if (!(change.address in blockBalanceChanges)) {
-                                    blockBalanceChanges[change.address] = change.delta
+                if (uncleBlocks > maxUncles) {
+                    throw "More than 2 uncles in " + block.number;
+                }
+
+                let miningReward = blockReward + (uncleBlocks * (blockReward / 32));
+                if (!(miner in blockBalanceChanges)) {
+                    blockBalanceChanges[miner] = Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString()));
+                } else {
+                    blockBalanceChanges[miner] = blockBalanceChanges[miner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString())));
+                }
+
+                if (uncleBlocks > 0) {
+                    let unclePromises = block.uncles.map((uncleHash: any, index: any) => {
+                        return new Promise((resolve, reject) => {
+                            Config.web3.eth.getUncle(block.number, index, false, (error:any, uncleBlock: any) => {
+                                resolve(uncleBlock);
+                            });
+                        });
+                    });
+
+                    Promise.all(unclePromises).then((uncleBlocks) => {
+                        uncleBlocks.forEach((uncleBlock: any) => {
+                            const distance = currentBlockNumber - uncleBlock.number;
+                            const multiplier = 8 - distance;
+                            if (multiplier < 1) {
+                                throw "Uncle " + uncleBlock.number + " too far from main " + currentBlockNumber;
+                            }
+                            if (multiplier > 7) {
+                                throw "Uncle " + uncleBlock.number + " too close to main " + currentBlockNumber;
+                            }
+                            const uncleMinerReward = multiplier * uncleReward;
+                            const uncleMiner = uncleBlock.author;
+
+                            if (uncleMinerReward != 0) {
+                                if (!(uncleMiner in blockBalanceChanges)) {
+                                    blockBalanceChanges[uncleMiner] = Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString()));
                                 } else {
-                                    blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
+                                    blockBalanceChanges[uncleMiner] = blockBalanceChanges[uncleMiner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString())));
                                 }
                             }
                         });
+
+                        self.getBalanceStateChanges(resolve, reject, block, blockBalanceChanges);
                     });
-                    resolve({block: block.number, changes: blockBalanceChanges});
+                } else {
+                    self.getBalanceStateChanges(resolve, reject, block, blockBalanceChanges);
+                }
+            });
+        });
+    }
+
+    getBalanceStateChanges(resolve:any, reject:any, block:any, blockBalanceChanges:any) {
+        Config.web3.getBlockStateChanges('0x' + block.number.toString(16), ["stateDiff"], (err: Error, stateChanges: any) => {
+            if (err) reject(err);
+            stateChanges.forEach((stateChange: any) => {
+                stateChange.forEach((change: any) => {
+                    if (change.delta != 0) {
+                        if (!(change.address in blockBalanceChanges)) {
+                            blockBalanceChanges[change.address] = change.delta
+                        } else {
+                            blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
+                        }
+                    }
                 });
             });
+            resolve({block: block.number, changes: blockBalanceChanges});
         });
     }
 
