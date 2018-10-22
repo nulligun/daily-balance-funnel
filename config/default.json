@@ -5,11 +5,11 @@
     "MYSQL_DATABASE": "funnel2",
     "RPC_SERVER": "http://127.0.0.1:8545",
   "PARSER": {
-    "MAX_CONCURRENT_BLOCKS": 15,
+    "MAX_CONCURRENT_BLOCKS": 8,
     "DELAYS": {
       "END_OF_BLOCK": 5000,
       "AFTER_VALIDATE": 100,
-      "BETWEEN_BLOCK": 50
+      "BETWEEN_BLOCK": 10
     }
   }
 }
