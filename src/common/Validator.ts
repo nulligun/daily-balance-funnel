@@ -54,9 +54,10 @@ export class Validator {
                         stateChange.forEach((change: any) => {
                             if (change.delta != 0) {
                                 if (!(change.address in blockBalanceChanges)) {
-                                    blockBalanceChanges[change.address] = Config.web3.utils.toBN(0);
+                                    blockBalanceChanges[change.address] = change.delta
+                                } else {
+                                    blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
                                 }
-                                blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
                             }
                         });
                     });
