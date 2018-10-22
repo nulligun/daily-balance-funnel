@@ -1,5 +1,6 @@
 import { Config } from "./Config";
 import moment = require("moment");
+import {min} from "moment";
 
 export class Validator {
     private connection : any;
@@ -30,34 +31,37 @@ export class Validator {
         return new Promise((resolve, reject) => {
             Config.web3.eth.getBlock(currentBlockNumber, true, function (error: any, result: any) {
                 const block = result;
+                let endOfDay = moment.unix(block.timestamp).utc().endOf('day').unix();
 
-                const m = moment.unix(block.timestamp).utc().endOf('day');
-
-                if (m.unix() > currentDayTimestamp) {
+                if (endOfDay > currentDayTimestamp) {
                     resolve({status: "done", block: block.number});
                     return;
                 }
 
-                let proms = self.process(block);
-                if (proms.length > 0) {
-                    Promise.all(proms).then((rawStateChanges) => {
-                        let blockBalanceChanges: any = {};
-                        rawStateChanges.forEach((rawStateChange: any) => {
-                            rawStateChange.changes.forEach((change: any) => {
+                let blockReward = 5;
+                let uncleReward = 3.75;
+                let maxUncles = 2;
+                let uncleBlocks = block.uncles.length;
+                if (uncleBlocks > maxUncles) uncleBlocks = maxUncles;
+                let miner = block.author;
+                let blockBalanceChanges: any = {};
+                let miningReward = blockReward + (uncleBlocks * (blockReward / 32)) + (uncleBlocks * uncleReward);
+                blockBalanceChanges[miner] = Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString()));
+
+                Config.web3.getBlockStateChanges('0x' + block.number.toString(16), ["stateDiff"], (err: Error, stateChanges: any) => {
+                    if (err) reject (err);
+                    stateChanges.forEach((stateChange:any) => {
+                        stateChange.forEach((change: any) => {
+                            if (change.delta != 0) {
                                 if (!(change.address in blockBalanceChanges)) {
                                     blockBalanceChanges[change.address] = Config.web3.utils.toBN(0);
                                 }
-
-                                if (change.delta != 0) {
-                                    blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
-                                }
-                            });
+                                blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
+                            }
                         });
-                        resolve({block: block.number, changes: blockBalanceChanges});
                     });
-                } else {
-                    resolve({block: block.number, changes: {}});
-                }
+                    resolve({block: block.number, changes: blockBalanceChanges});
+                });
             });
         });
     }
@@ -142,25 +146,5 @@ export class Validator {
                 if (error) throw error;
             });
         }
-    }
-
-    private process(block: any) {
-        const transactions = block.transactions;
-        let endOfDay = moment.unix(block.timestamp).utc().endOf('day').unix();
-        if (transactions.length === 0) return [];
-
-        return transactions.map((tx:any) => {
-            let thisT = tx;
-            return new Promise((resolve, reject) => {
-                Config.web3.getBalanceStateChanges(thisT.hash, ["stateDiff"], (err: Error, stateChange: any) => {
-                    if (err) reject (err);
-                    if (!stateChange) {
-                        resolve(null);
-                        return;
-                    }
-                    resolve({changes: stateChange, timestamp: endOfDay});
-                });
-            });
-        });
     }
 }

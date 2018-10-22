@@ -8,6 +8,7 @@
     "MAX_CONCURRENT_BLOCKS": 15,
     "DELAYS": {
       "END_OF_BLOCK": 5000,
+      "AFTER_VALIDATE": 100,
       "BETWEEN_BLOCK": 50
     }
   }

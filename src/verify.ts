@@ -31,6 +31,7 @@ const connection = mysql.createConnection({
 let maxConcurrentBlocks = parseInt(config.get("PARSER.MAX_CONCURRENT_BLOCKS")) || 5;
 let endOfBlockDelay = parseInt(config.get("PARSER.DELAYS.END_OF_BLOCK")) || 5000;
 let betweenBlockDelay = parseInt(config.get("PARSER.DELAYS.BETWEEN_BLOCK")) || 100;
+let afterValidateDelay = parseInt(config.get("PARSER.DELAYS.AFTER_VALIDATE")) || 800;
 let checkpoint = 1000;
 
 connection.query("select current_full_validate_block from validate_status", function(error:any, results:any, fields:any) {
@@ -55,6 +56,7 @@ connection.query("select current_full_validate_block from validate_status", func
                 Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
                     if (error) throw error;
                     let lastBlockTimestamp = moment.unix(result.timestamp).utc().endOf('day').unix();
+                    console.log("LastBlock: " + lastBlockTimestamp + " EndOfDayTime: " + lastBlockTimestamp);
 
                     let blocks: any = [];
                     let currentDayBalance: any = {};
@@ -73,12 +75,14 @@ connection.query("select current_full_validate_block from validate_status", func
                             }
                             console.log("At last block, sleeping...");
                             setDelay(endOfBlockDelay).then(() => {
-                                latestBlockOnChain = Config.web3.eth.getBlockNumber();
-                                progressInfo = new ProgressInfo(latestBlockOnChain, checkpoint);
-                                Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
-                                    if (error) throw error;
-                                    lastBlockTimestamp = moment.unix(result.timestamp).utc().endOf('day').unix();
-                                    setTimeout(process, betweenBlockDelay);
+                                Config.web3.eth.getBlockNumber((error:any, number:any) => {
+                                    latestBlockOnChain = number;
+                                    progressInfo = new ProgressInfo(latestBlockOnChain, checkpoint);
+                                    Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
+                                        if (error) throw error;
+                                        lastBlockTimestamp = moment.unix(result.timestamp).utc().endOf('day').unix();
+                                        setTimeout(process, betweenBlockDelay);
+                                    });
                                 });
                             });
                             return;
@@ -121,11 +125,9 @@ connection.query("select current_full_validate_block from validate_status", func
                                         console.log("Moving on to block: " + currentBlockNumber);
                                     }
                                     blocks = [];
-                                    if (done || (currentDayTimestamp === lastBlockTimestamp)) {
-                                        starter.validate(currentDayTimestamp, currentDayBalance).then((res) => {});
-
-                                        Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
-                                            if (done) {
+                                    if (done) {
+                                        starter.validate(currentDayTimestamp, currentDayBalance).then(() => {
+                                            Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
                                                 const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
                                                 currentDayTimestamp = m.unix();
                                                 console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
@@ -135,10 +137,23 @@ connection.query("select current_full_validate_block from validate_status", func
                                                         throw error;
                                                     }
                                                 });
-                                            }
+                                                setTimeout(process, afterValidateDelay);
+                                                return;
+                                            });
+                                        });
+                                    } else if (currentDayTimestamp === lastBlockTimestamp) {
+                                        if ((currentBlockNumber % 100) === 0) {
+                                            starter.validate(currentDayTimestamp, currentDayBalance).then(() => {
+                                                Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
+                                                    console.log("Updated last day on block " + currentBlockNumber);
+                                                    setTimeout(process, afterValidateDelay);
+                                                    return;
+                                                });
+                                            });
+                                        } else {
                                             setTimeout(process, betweenBlockDelay);
                                             return;
-                                        });
+                                        }
                                     } else {
                                         setTimeout(process, betweenBlockDelay);
                                         return;
