@@ -134,40 +134,54 @@ export class Validator {
                         if (err) {
                             throw err;
                         }
-                        self.connection.query("select id from addresses where address=? for update", [address], function (error: any, results: any, fields: any) {
-                            if (error) {
-                                throw error;
+                        self.connection.query("lock tables addresses write", function(error: any, results: any, fields: any) {
+                            if (err) {
+                                throw err;
                             }
-                            if (results.length === 0) {
-                                self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
-                                    if (error) {
-                                        throw error;
-                                    }
-
-                                    self.connection.commit(function (error: any) {
+                            self.connection.query("select id from addresses where address=? for update", [address], function (error: any, results: any, fields: any) {
+                                if (error) {
+                                    throw error;
+                                }
+                                if (results.length === 0) {
+                                    self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
                                         if (error) {
-                                            self.connection.rollback(function () {
-                                                throw err;
-                                            });
+                                            throw error;
                                         }
-                                        self.addresses[address] = results.insertId;
-                                        self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
-                                        resolve();
-                                        return;
-                                    });
-                                });
-                            } else {
-                                self.connection.commit(function (error: any) {
-                                    if (error) {
-                                        self.connection.rollback(function () {
-                                            throw err;
+                                        self.connection.query("unlock tables", function(error: any, results: any, fields: any) {
+                                            if (err) {
+                                                throw err;
+                                            }
+                                            self.connection.commit(function (error: any) {
+                                                if (error) {
+                                                    self.connection.rollback(function () {
+                                                        throw err;
+                                                    });
+                                                }
+                                                self.addresses[address] = results.insertId;
+                                                self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
+                                                resolve();
+                                                return;
+                                            });
                                         });
-                                    }
-                                    self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
-                                    resolve();
-                                    return;
-                                });
-                            }
+                                    });
+                                } else {
+                                    self.connection.query("unlock tables", function(error: any, results: any, fields: any) {
+                                        if (err) {
+                                            throw err;
+                                        }
+                                        self.connection.commit(function (error: any) {
+                                            if (error) {
+                                                self.connection.rollback(function () {
+                                                    throw err;
+                                                });
+                                            }
+                                            self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
+                                            resolve();
+                                            return;
+                                        });
+                                    });
+                                }
+                            });
                         });
                     });
                 } else {
