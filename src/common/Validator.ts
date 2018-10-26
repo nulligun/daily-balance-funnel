@@ -126,6 +126,8 @@ export class Validator {
         const self = this;
         let ts = timestamp;
         return new Promise((resolve, reject) => {
+            //TODO: WE can just resolve, because now we go through this twice. (earned/spent)
+
             if (Object.keys(balances).length === 0) { resolve(); }
             Object.keys(balances).forEach((actionType) => {
                 Object.keys(balances[actionType]).forEach((address) => {
@@ -134,7 +136,7 @@ export class Validator {
                             if (err) {
                                 throw err;
                             }
-                            self.connection.query("select id from addresses where address=?", [address], function (error: any, results: any, fields: any) {
+                            self.connection.query("select id from addresses where address=? for share", [address], function (error: any, results: any, fields: any) {
                                 if (error) {
                                     throw error;
                                 }
@@ -182,7 +184,7 @@ export class Validator {
         let self = this;
         let earned = actionType === "earned";
         if (this.shouldVerify) {
-            self.connection.query("select delta from balances where balance_date = ? and address_id = ? and earned = ?", [timestamp, address_id, earned], function (error: any, results: any, fields: any) {
+            self.connection.query("select delta from balances where balance_date = ? and address_id = ? and earned = ? for share", [timestamp, address_id, earned], function (error: any, results: any, fields: any) {
                 if (error) throw error;
                 if (results.length === 0) {
                     console.log("Balance not found for " + address_id + " on " + timestamp);
