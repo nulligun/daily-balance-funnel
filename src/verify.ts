@@ -76,11 +76,12 @@ connection.query("select current_full_validate_block from validate_status", func
                             console.log("At last block, sleeping...");
                             setDelay(endOfBlockDelay).then(() => {
                                 Config.web3.eth.getBlockNumber((error:any, number:any) => {
+                                    if (error) throw error;
                                     latestBlockOnChain = number;
-                                    progressInfo = new ProgressInfo(latestBlockOnChain, checkpoint);
                                     Config.web3.eth.getBlock(latestBlockOnChain, false, function (error: any, result: any) {
                                         if (error) throw error;
                                         lastBlockTimestamp = moment.unix(result.timestamp).utc().endOf('day').unix();
+                                        progressInfo = new ProgressInfo(latestBlockOnChain, checkpoint);
                                         setTimeout(process, betweenBlockDelay);
                                     });
                                 });
