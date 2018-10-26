@@ -39,7 +39,7 @@ export class Validator {
                 }
                 let blockReward = 5;
                 let miner = block.author;
-                let blockBalanceChanges: any = {'earned': {}, 'spent': {}};
+                let blockBalanceChanges: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
                 let uncleBlocks = block.uncles.length;
                 let uncleReward = 0.625;
                 let maxUncles = 2;
@@ -122,59 +122,71 @@ export class Validator {
         });
     }
 
-    validate(timestamp : any, balances: any) {
-        const self = this;
+    validateType(timestamp: any, balances : any, actionType: any)
+    {
         let ts = timestamp;
+        const self = this;
+
         return new Promise((resolve, reject) => {
-            //TODO: WE can just resolve, because now we go through this twice. (earned/spent)
-
-            if (Object.keys(balances).length === 0) { resolve(); }
-            Object.keys(balances).forEach((actionType) => {
-                Object.keys(balances[actionType]).forEach((address) => {
-                    if (!(address in this.addresses)) {
-                        self.connection.beginTransaction(function (err: any) {
-                            if (err) {
-                                throw err;
+            Object.keys(balances[actionType]).forEach((address) => {
+                if (!(address in this.addresses)) {
+                    self.connection.beginTransaction(function (err: any) {
+                        if (err) {
+                            throw err;
+                        }
+                        self.connection.query("select id from addresses where address=? for update", [address], function (error: any, results: any, fields: any) {
+                            if (error) {
+                                throw error;
                             }
-                            self.connection.query("select id from addresses where address=? for share", [address], function (error: any, results: any, fields: any) {
-                                if (error) {
-                                    throw error;
-                                }
-                                if (results.length === 0) {
-                                    self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
-                                        if (error) {
-                                            throw error;
-                                        }
+                            if (results.length === 0) {
+                                self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
+                                    if (error) {
+                                        throw error;
+                                    }
 
-                                        self.connection.commit(function (error: any) {
-                                            if (error) {
-                                                self.connection.rollback(function () {
-                                                    throw err;
-                                                });
-                                            }
-                                            self.addresses[address] = results.insertId;
-                                            self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
-                                            resolve();
-                                        });
-                                    });
-                                } else {
                                     self.connection.commit(function (error: any) {
                                         if (error) {
                                             self.connection.rollback(function () {
                                                 throw err;
                                             });
                                         }
-                                        self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
+                                        self.addresses[address] = results.insertId;
+                                        self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
                                         resolve();
+                                        return;
                                     });
-                                }
-                            });
+                                });
+                            } else {
+                                self.connection.commit(function (error: any) {
+                                    if (error) {
+                                        self.connection.rollback(function () {
+                                            throw err;
+                                        });
+                                    }
+                                    self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
+                                    resolve();
+                                    return;
+                                });
+                            }
                         });
-                    } else {
-                        self.validateBalances(ts, balances[actionType][address], self.addresses[address], actionType);
-                        resolve();
-                    }
-                });
+                    });
+                } else {
+                    self.validateBalances(ts, balances[actionType][address], self.addresses[address], actionType);
+                    resolve();
+                    return;
+                }
+            });
+            resolve();
+        });
+    }
+
+    validate(timestamp : any, balances: any) {
+        const self = this;
+        return new Promise((resolve, reject) => {
+            let earnedP = self.validateType(timestamp, balances, 'earned');
+            let spentP = self.validateType(timestamp, balances, 'spent');
+            Promise.all([earnedP, spentP]).then(() => {
+               resolve();
             });
         });
     }
@@ -182,9 +194,9 @@ export class Validator {
     private validateBalances(timestamp:any, balance:any, address_id:any, actionType: any)
     {
         let self = this;
-        let earned = actionType === "earned";
+        let earned = (actionType === "earned");
         if (this.shouldVerify) {
-            self.connection.query("select delta from balances where balance_date = ? and address_id = ? and earned = ? for share", [timestamp, address_id, earned], function (error: any, results: any, fields: any) {
+            self.connection.query("select delta from balances where balance_date = ? and address_id = ? and earned = ? for update", [timestamp, address_id, earned], function (error: any, results: any, fields: any) {
                 if (error) throw error;
                 if (results.length === 0) {
                     console.log("Balance not found for " + address_id + " on " + timestamp);

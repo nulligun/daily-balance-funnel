@@ -59,7 +59,7 @@ connection.query("select current_full_validate_block from validate_status", func
                     console.log("LastBlock: " + lastBlockTimestamp + " EndOfDayTime: " + lastBlockTimestamp);
 
                     let blocks: any = [];
-                    let currentDayBalance: any = {'earned': {}, 'spent': {}};
+                    let currentDayBalance: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
 
                     setTimeout(process, betweenBlockDelay);
 
@@ -141,7 +141,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                                 const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
                                                 currentDayTimestamp = m.unix();
                                                 console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
-                                                currentDayBalance = {'earned': {}, 'spent': {}};
+                                                currentDayBalance = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
                                                 connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
                                                     if (error) {
                                                         throw error;
