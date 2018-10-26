@@ -19,8 +19,8 @@ export class Validator {
             self.connection.query("select * from addresses", function (error: any, results: any, fields: any) {
                results.forEach((result:any) => {
                    self.addresses[result.address] = result.id;
-                   resolve();
                });
+               resolve();
             });
         });
     }
@@ -39,7 +39,7 @@ export class Validator {
                 }
                 let blockReward = 5;
                 let miner = block.author;
-                let blockBalanceChanges: any = {};
+                let blockBalanceChanges: any = {'earned': {}, 'spent': {}};
                 let uncleBlocks = block.uncles.length;
                 let uncleReward = 0.625;
                 let maxUncles = 2;
@@ -49,10 +49,10 @@ export class Validator {
                 }
 
                 let miningReward = blockReward + (uncleBlocks * (blockReward / 32));
-                if (!(miner in blockBalanceChanges)) {
-                    blockBalanceChanges[miner] = Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString()));
+                if (!(miner in blockBalanceChanges['earned'])) {
+                    blockBalanceChanges['earned'][miner] = Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString()));
                 } else {
-                    blockBalanceChanges[miner] = blockBalanceChanges[miner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString())));
+                    blockBalanceChanges['earned'][miner] = blockBalanceChanges['earned'][miner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(miningReward.toString())));
                 }
 
                 if (uncleBlocks > 0) {
@@ -78,10 +78,10 @@ export class Validator {
                             const uncleMiner = uncleBlock.author;
 
                             if (uncleMinerReward != 0) {
-                                if (!(uncleMiner in blockBalanceChanges)) {
-                                    blockBalanceChanges[uncleMiner] = Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString()));
+                                if (!(uncleMiner in blockBalanceChanges['earned'])) {
+                                    blockBalanceChanges['earned'][uncleMiner] = Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString()));
                                 } else {
-                                    blockBalanceChanges[uncleMiner] = blockBalanceChanges[uncleMiner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString())));
+                                    blockBalanceChanges['earned'][uncleMiner] = blockBalanceChanges['earned'][uncleMiner].add(Config.web3.utils.toBN(Config.web3.utils.toWei(uncleMinerReward.toString())));
                                 }
                             }
                         });
@@ -100,11 +100,20 @@ export class Validator {
             if (err) reject(err);
             stateChanges.forEach((stateChange: any) => {
                 stateChange.forEach((change: any) => {
-                    if (change.delta != 0) {
-                        if (!(change.address in blockBalanceChanges)) {
-                            blockBalanceChanges[change.address] = change.delta
+                    if (change.delta > 0)
+                    {
+                        if (!(change.address in blockBalanceChanges['earned'])) {
+                            blockBalanceChanges['earned'][change.address] = change.delta
                         } else {
-                            blockBalanceChanges[change.address] = blockBalanceChanges[change.address].add(change.delta);
+                            blockBalanceChanges['earned'][change.address] = blockBalanceChanges['earned'][change.address].add(change.delta);
+                        }
+                    }
+                    else if (change.delta < 0)
+                    {
+                        if (!(change.address in blockBalanceChanges['spent'])) {
+                            blockBalanceChanges['spent'][change.address] = change.delta
+                        } else {
+                            blockBalanceChanges['spent'][change.address] = blockBalanceChanges['spent'][change.address].add(change.delta);
                         }
                     }
                 });
@@ -118,78 +127,79 @@ export class Validator {
         let ts = timestamp;
         return new Promise((resolve, reject) => {
             if (Object.keys(balances).length === 0) { resolve(); }
-            Object.keys(balances).forEach((address) => {
-                if (!(address in this.addresses))
-                {
-                    self.connection.beginTransaction(function(err:any) {
-                        if (err) {
-                            throw err;
-                        }
-                        self.connection.query("select id from addresses where address=?", [address], function (error:any, results:any, fields:any) {
-                            if (error) {
-                                throw error;
+            Object.keys(balances).forEach((actionType) => {
+                Object.keys(balances[actionType]).forEach((address) => {
+                    if (!(address in this.addresses)) {
+                        self.connection.beginTransaction(function (err: any) {
+                            if (err) {
+                                throw err;
                             }
-                            if (results.length === 0)
-                            {
-                                self.connection.query("insert into addresses set address=?", address, function(error:any, results:any, fields:any) {
-                                    if (error) {
-                                        throw error;
-                                    }
+                            self.connection.query("select id from addresses where address=?", [address], function (error: any, results: any, fields: any) {
+                                if (error) {
+                                    throw error;
+                                }
+                                if (results.length === 0) {
+                                    self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
+                                        if (error) {
+                                            throw error;
+                                        }
 
-                                    self.connection.commit(function(error:any) {
+                                        self.connection.commit(function (error: any) {
+                                            if (error) {
+                                                self.connection.rollback(function () {
+                                                    throw err;
+                                                });
+                                            }
+                                            self.addresses[address] = results.insertId;
+                                            self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
+                                            resolve();
+                                        });
+                                    });
+                                } else {
+                                    self.connection.commit(function (error: any) {
                                         if (error) {
                                             self.connection.rollback(function () {
                                                 throw err;
                                             });
                                         }
-                                        self.addresses[address] = results.insertId;
-                                        self.validateBalances(ts, balances[address], results.insertId);
+                                        self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
                                         resolve();
                                     });
-                                });
-                            } else {
-                                self.connection.commit(function (error: any) {
-                                    if (error) {
-                                        self.connection.rollback(function () {
-                                            throw err;
-                                        });
-                                    }
-                                    self.validateBalances(ts, balances[address], results[0].id);
-                                    resolve();
-                                });
-                            }
+                                }
+                            });
                         });
-                    });
-                } else {
-                    self.validateBalances(ts, balances[address], self.addresses[address]);
-                    resolve();
-                }
+                    } else {
+                        self.validateBalances(ts, balances[actionType][address], self.addresses[address], actionType);
+                        resolve();
+                    }
+                });
             });
         });
     }
 
-    private validateBalances(timestamp:any, balance:any, address_id:any)
+    private validateBalances(timestamp:any, balance:any, address_id:any, actionType: any)
     {
-        const self = this;
+        let self = this;
+        let earned = actionType === "earned";
         if (this.shouldVerify) {
-            self.connection.query("select delta from balances where balance_date = ? and address_id = ?", [timestamp, address_id], function (error: any, results: any, fields: any) {
+            self.connection.query("select delta from balances where balance_date = ? and address_id = ? and earned = ?", [timestamp, address_id, earned], function (error: any, results: any, fields: any) {
                 if (error) throw error;
                 if (results.length === 0) {
                     console.log("Balance not found for " + address_id + " on " + timestamp);
-                    self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
+                    self.connection.query("replace into balances (balance_date, address_id, earned, delta) values (?, ?, ?, ?)", [timestamp, address_id, earned, balance.toString()], function (error: any, results: any, fields: any) {
                         if (error) throw error;
                     });
                 } else {
                     if (results[0].delta !== balance.toString()) {
                         console.log("Balance not a match for " + address_id + " on " + timestamp);
-                        self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
+                        self.connection.query("replace into balances (balance_date, address_id, earned, delta) values (?, ?, ?, ?)", [timestamp, address_id, earned, balance.toString()], function (error: any, results: any, fields: any) {
                             if (error) throw error;
                         });
                     }
                 }
             });
         } else {
-            self.connection.query("replace into balances (balance_date, address_id, delta) values (?, ?, ?)", [timestamp, address_id, balance.toString()], function (error: any, results: any, fields: any) {
+            self.connection.query("replace into balances (balance_date, address_id, earned, delta) values (?, ?, ?, ?)", [timestamp, address_id, earned, balance.toString()], function (error: any, results: any, fields: any) {
                 if (error) throw error;
             });
         }

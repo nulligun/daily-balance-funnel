@@ -59,7 +59,7 @@ connection.query("select current_full_validate_block from validate_status", func
                     console.log("LastBlock: " + lastBlockTimestamp + " EndOfDayTime: " + lastBlockTimestamp);
 
                     let blocks: any = [];
-                    let currentDayBalance: any = {};
+                    let currentDayBalance: any = {'earned': {}, 'spent': {}};
 
                     setTimeout(process, betweenBlockDelay);
 
@@ -105,13 +105,22 @@ connection.query("select current_full_validate_block from validate_status", func
                                             if (result.block > maxValidBlock) {
                                                 maxValidBlock = result.block;
                                             }
-                                            Object.keys(result.changes).forEach((address: any) => {
-                                                if (!(address in currentDayBalance)) {
-                                                    currentDayBalance[address] = Config.web3.utils.toBN(0);
+                                            Object.keys(result.changes['earned']).forEach((address: any) => {
+                                                if (!(address in currentDayBalance['earned'])) {
+                                                    currentDayBalance['earned'][address] = Config.web3.utils.toBN(0);
                                                 }
 
                                                 if (results[address] != 0) {
-                                                    currentDayBalance[address] = currentDayBalance[address].add(result.changes[address]);
+                                                    currentDayBalance['earned'][address] = currentDayBalance['earned'][address].add(result.changes['earned'][address]);
+                                                }
+                                            });
+                                            Object.keys(result.changes['spent']).forEach((address: any) => {
+                                                if (!(address in currentDayBalance['spent'])) {
+                                                    currentDayBalance['spent'][address] = Config.web3.utils.toBN(0);
+                                                }
+
+                                                if (results[address] != 0) {
+                                                    currentDayBalance['spent'][address] = currentDayBalance['spent'][address].add(result.changes['spent'][address]);
                                                 }
                                             });
                                         }
@@ -132,7 +141,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                                 const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
                                                 currentDayTimestamp = m.unix();
                                                 console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
-                                                currentDayBalance = {};
+                                                currentDayBalance = {'earned': {}, 'spent': {}};
                                                 connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
                                                     if (error) {
                                                         throw error;
