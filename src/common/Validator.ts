@@ -1,6 +1,5 @@
 import { Config } from "./Config";
 import moment = require("moment");
-import {min} from "moment";
 
 export class Validator {
     private connection : any;
@@ -130,57 +129,23 @@ export class Validator {
         return new Promise((resolve, reject) => {
             Object.keys(balances[actionType]).forEach((address) => {
                 if (!(address in this.addresses)) {
-                    self.connection.beginTransaction(function (err: any) {
-                        if (err) {
-                            throw err;
+                    self.connection.query("set autocommit=0", function(error:any) {
+                        if (error) {
+                            throw error;
                         }
-                        self.connection.query("lock tables addresses write", function(error: any, results: any, fields: any) {
-                            if (err) {
-                                throw err;
+                        self.connection.query("insert into addresses set address=? on duplicate key update address=?", [address, address], function (error: any, results: any, fields: any) {
+                            if (error) {
+                                throw error;
                             }
-                            self.connection.query("select id from addresses where address=? for update", [address], function (error: any, results: any, fields: any) {
+                            self.connection.commit(function (error: any) {
                                 if (error) {
                                     throw error;
                                 }
-                                if (results.length === 0) {
-                                    self.connection.query("insert into addresses set address=?", address, function (error: any, results: any, fields: any) {
-                                        if (error) {
-                                            throw error;
-                                        }
-                                        self.connection.query("unlock tables", function(error: any, results: any, fields: any) {
-                                            if (err) {
-                                                throw err;
-                                            }
-                                            self.connection.commit(function (error: any) {
-                                                if (error) {
-                                                    self.connection.rollback(function () {
-                                                        throw err;
-                                                    });
-                                                }
-                                                self.addresses[address] = results.insertId;
-                                                self.validateBalances(ts, balances[actionType][address], results.insertId, actionType);
-                                                resolve();
-                                                return;
-                                            });
-                                        });
-                                    });
-                                } else {
-                                    self.connection.query("unlock tables", function(error: any, results: any, fields: any) {
-                                        if (err) {
-                                            throw err;
-                                        }
-                                        self.connection.commit(function (error: any) {
-                                            if (error) {
-                                                self.connection.rollback(function () {
-                                                    throw err;
-                                                });
-                                            }
-                                            self.validateBalances(ts, balances[actionType][address], results[0].id, actionType);
-                                            resolve();
-                                            return;
-                                        });
-                                    });
-                                }
+                                let lastInsertId = results.insertId;
+                                self.addresses[address] = lastInsertId;
+                                self.validateBalances(ts, balances[actionType][address], lastInsertId, actionType);
+                                resolve();
+                                return;
                             });
                         });
                     });
@@ -228,7 +193,9 @@ export class Validator {
             });
         } else {
             self.connection.query("replace into balances (balance_date, address_id, earned, delta) values (?, ?, ?, ?)", [timestamp, address_id, earned, balance.toString()], function (error: any, results: any, fields: any) {
-                if (error) throw error;
+                if (error) {
+                    throw error;
+                }
             });
         }
     }
