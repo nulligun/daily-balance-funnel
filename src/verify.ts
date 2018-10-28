@@ -59,7 +59,7 @@ connection.query("select current_full_validate_block from validate_status", func
                     console.log("LastBlock: " + lastBlockTimestamp + " EndOfDayTime: " + lastBlockTimestamp);
 
                     let blocks: any = [];
-                    let currentDayBalance: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
+                    let currentDayBalance: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}, 'stats': {}};
 
                     setTimeout(process, betweenBlockDelay);
 
@@ -94,6 +94,9 @@ connection.query("select current_full_validate_block from validate_status", func
                                 let maxValidBlock = 0;
                                 let maxBlockNumber = 0;
                                 let done = false;
+                                let totalTransactions = 0;
+                                let difficulty = Config.web3.utils.toBN(0);
+                                let blocksInDay = 0;
                                 Promise.all(blocks).then((results: any) => {
                                     results.forEach((result: any) => {
                                         if (result.block > maxBlockNumber) {
@@ -105,6 +108,9 @@ connection.query("select current_full_validate_block from validate_status", func
                                             if (result.block > maxValidBlock) {
                                                 maxValidBlock = result.block;
                                             }
+                                            blocksInDay = blocksInDay + 1;
+                                            difficulty = difficulty.add(result.changes['stats']['difficulty']);
+                                            totalTransactions = totalTransactions + result.changes['stats']['transactions'];
                                             Object.keys(result.changes['earned']).forEach((address: any) => {
                                                 if (!(address in currentDayBalance['earned'])) {
                                                     currentDayBalance['earned'][address] = Config.web3.utils.toBN(0);
@@ -136,12 +142,17 @@ connection.query("select current_full_validate_block from validate_status", func
                                     }
                                     blocks = [];
                                     if (done) {
+                                        let diff = Config.web3.utils.toBN(0);
+                                        if (blocksInDay > 0) {
+                                            diff = difficulty.div(Config.web3.utils.toBN(blocksInDay));
+                                        }
+                                        currentDayBalance['stats'] = {'difficulty': diff, 'transactions': totalTransactions, 'lastBlock': maxValidBlock};
                                         starter.validate(currentDayTimestamp, currentDayBalance).then(() => {
                                             Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
                                                 const m = moment.unix(firstBlock.timestamp).utc().endOf('day');
                                                 currentDayTimestamp = m.unix();
                                                 console.log("Started new day: " + currentDayTimestamp + " on block " + currentBlockNumber);
-                                                currentDayBalance = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
+                                                currentDayBalance = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}, 'stats': {}};
                                                 connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
                                                     if (error) {
                                                         throw error;
@@ -152,7 +163,8 @@ connection.query("select current_full_validate_block from validate_status", func
                                             });
                                         });
                                     } else if (currentDayTimestamp === lastBlockTimestamp) {
-                                        if ((currentBlockNumber % 100) === 0) {
+                                        if ((currentBlockNumber % 20) === 0) {
+                                            currentDayBalance['stats'] = {'difficulty': difficulty.divide(blocksInDay), 'transactions': totalTransactions, 'lastBlock': maxValidBlock}
                                             starter.validate(currentDayTimestamp, currentDayBalance).then(() => {
                                                 Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
                                                     console.log("Updated last day on block " + currentBlockNumber);

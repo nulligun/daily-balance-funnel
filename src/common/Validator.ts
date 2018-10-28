@@ -38,7 +38,7 @@ export class Validator {
                 }
                 let blockReward = 5;
                 let miner = block.author;
-                let blockBalanceChanges: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}};
+                let blockBalanceChanges: any = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}, 'stats': {'difficulty': Config.web3.utils.toBN(block.difficulty), 'transactions': block.transactions.length}};
                 let uncleBlocks = block.uncles.length;
                 let uncleReward = 0.625;
                 let maxUncles = 2;
@@ -133,7 +133,7 @@ export class Validator {
                         if (error) {
                             throw error;
                         }
-                        self.connection.query("insert into addresses set address=? on duplicate key update address=?", [address, address], function (error: any, results: any, fields: any) {
+                        self.connection.query("insert into addresses set address=? on duplicate key update id=LAST_INSERT_ID(id)", [address, address], function (error: any, results: any, fields: any) {
                             if (error) {
                                 throw error;
                             }
@@ -159,14 +159,26 @@ export class Validator {
         });
     }
 
-    validate(timestamp : any, balances: any) {
+    validateStats(timestamp: any, stats:any)
+    {
+        const self = this;
+        return new Promise((resolve, reject) => {
+            self.connection.query("replace into daily_aggregates (transaction_date, difficulty, transactions, block) values (?, ?, ?, ?)", [timestamp, stats['difficulty'].toString(), stats['transactions'], stats['lastBlock']], function (error: any, results: any, fields: any) {
+                if (error) throw error;
+                resolve();
+            });
+        });
+    }
+
+    validate(timestamp: any, balances: any) {
         const self = this;
         return new Promise((resolve, reject) => {
             let earnedP = self.validateType(timestamp, balances, 'earned');
             let spentP = self.validateType(timestamp, balances, 'spent');
-            Promise.all([earnedP, spentP]).then(() => {
-               resolve();
-            });
+            let statsP = self.validateStats(timestamp, balances['stats']);
+            Promise.all([earnedP, spentP, statsP]).then(() => {
+                resolve();
+            })
         });
     }
 
