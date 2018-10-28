@@ -164,7 +164,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                         });
                                     } else if (currentDayTimestamp === lastBlockTimestamp) {
                                         if ((currentBlockNumber % 20) === 0) {
-                                            currentDayBalance['stats'] = {'difficulty': difficulty.divide(blocksInDay), 'transactions': totalTransactions, 'lastBlock': maxValidBlock}
+                                            currentDayBalance['stats'] = {'difficulty': difficulty.div(blocksInDay), 'transactions': totalTransactions, 'lastBlock': maxValidBlock}
                                             starter.validate(currentDayTimestamp, currentDayBalance).then(() => {
                                                 Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock: any) => {
                                                     console.log("Updated last day on block " + currentBlockNumber);
