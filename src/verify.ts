@@ -34,11 +34,11 @@ let betweenBlockDelay = parseInt(config.get("PARSER.DELAYS.BETWEEN_BLOCK")) || 1
 let afterValidateDelay = parseInt(config.get("PARSER.DELAYS.AFTER_VALIDATE")) || 800;
 let checkpoint = 1000;
 
-connection.query("select current_full_validate_block from validate_status", function(error:any, results:any, fields:any) {
+connection.query("select value from status_variables where id = 'current_full_validate_block'", function(error:any, results:any, fields:any) {
     let currentBlockNumber = 1;
     if (error) throw error;
     if (results.length > 0) {
-        currentBlockNumber = results[0].current_full_validate_block;
+        currentBlockNumber = results[0].value;
     }
 
     Config.web3.eth.getBlock(currentBlockNumber, true).then((firstBlock:any) => {
@@ -158,7 +158,7 @@ connection.query("select current_full_validate_block from validate_status", func
                                                 difficulty = Config.web3.utils.toBN(0);
                                                 blocksInDay = 0;
                                                 currentDayBalance = {'earned': {}, 'spent': {}, 'tx_earned': {}, 'tx_spent': {}, 'stats': {}};
-                                                connection.query("replace into validate_status (id, current_full_validate_block) values (1, ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
+                                                connection.query("replace into status_variables (id, value) values ('current_full_validate_block', ?)", [currentBlockNumber], function (error: any, results: any, fields: any) {
                                                     if (error) {
                                                         throw error;
                                                     }
